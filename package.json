@@ -1,0 +1,61 @@
+{
+  "name": "linear-metabase",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "src/sync/cli.ts",
+  "description": "Robust ETL pipeline for syncing Linear data to PostgreSQL, designed for analytics and reporting with Metabase. Features automatic dependency resolution, intelligent error handling, and comprehensive data synchronization.",
+  "keywords": [
+    "linear",
+    "metabase",
+    "etl",
+    "sync",
+    "postgresql",
+    "analytics",
+    "data-pipeline",
+    "typescript"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/linear-metabase.git"
+  },
+  "homepage": "https://github.com/yourusername/linear-metabase#readme",
+  "bugs": {
+    "url": "https://github.com/yourusername/linear-metabase/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/sync/cli.ts",
+    "sync": "tsx src/sync/cli.ts",
+    "sync:all": "tsx src/sync/cli.ts all",
+    "sync:incremental": "tsx src/sync/cli.ts all --incremental",
+    "sync:essentials": "tsx src/sync/cli.ts essentials",
+    "sync:help": "tsx src/sync/cli.ts help",
+    "sync:stats": "tsx src/sync/cli.ts stats",
+    "sync:validate": "tsx src/sync/cli.ts validate",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "lint": "tsc --noEmit",
+    "verify": "tsx scripts/verify-setup.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@linear/sdk": "^56.0.0",
+    "dotenv": "^17.2.1",
+    "drizzle-orm": "^0.44.4",
+    "postgres": "^3.4.7"
+  }
+}
