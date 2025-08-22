@@ -1,5 +1,12 @@
 import { eq } from "drizzle-orm";
-import { cycles, issues, type NewIssue, teams, users } from "../db/schema.js";
+import {
+	cycles,
+	issues,
+	type NewIssue,
+	projects,
+	teams,
+	users,
+} from "../db/schema.js";
 import { BaseSyncService } from "./base-sync.js";
 import { CycleSyncService } from "./cycle-sync.js";
 import { TeamSyncService } from "./team-sync.js";
@@ -40,6 +47,7 @@ interface LinearIssue {
 	snoozedUntilAt?: string | undefined;
 	team?: { id: string } | undefined;
 	cycle?: { id: string } | undefined;
+	project?: { id: string } | undefined;
 	assignee?: { id: string } | undefined;
 	creator?: { id: string } | undefined;
 }
@@ -97,6 +105,9 @@ export class IssueSyncService extends BaseSyncService {
 							id
 						}
 						cycle {
+							id
+						}
+						project {
 							id
 						}
 						assignee {
@@ -180,6 +191,9 @@ export class IssueSyncService extends BaseSyncService {
 								id
 							}
 							cycle {
+								id
+							}
+							project {
 								id
 							}
 							assignee {
@@ -541,6 +555,7 @@ export class IssueSyncService extends BaseSyncService {
 		const assigneeId = linearIssue.assignee?.id || null;
 		const creatorId = linearIssue.creator?.id || null;
 		const cycleId = linearIssue.cycle?.id || null;
+		const projectId = linearIssue.project?.id || null;
 
 		// Ensure dependencies exist before creating issue
 		if (!teamId) {
@@ -560,6 +575,10 @@ export class IssueSyncService extends BaseSyncService {
 
 		if (cycleId) {
 			await this.ensureCycleExists(cycleId);
+		}
+
+		if (projectId) {
+			await this.ensureProjectExists(projectId);
 		}
 		// Parse labels from Linear format
 		let labels = null;
@@ -598,6 +617,7 @@ export class IssueSyncService extends BaseSyncService {
 			id: linearIssue.id,
 			teamId: teamId,
 			cycleId: cycleId,
+			projectId: projectId,
 			number: linearIssue.number,
 			title: linearIssue.title,
 			description: linearIssue.description || null,
@@ -723,6 +743,23 @@ export class IssueSyncService extends BaseSyncService {
 				console.error(`❌ Failed to sync cycle ${cycleId}:`, error);
 				throw new Error(`Cannot sync issue - cycle ${cycleId} sync failed`);
 			}
+		}
+	}
+
+	/**
+	 * Ensure a project exists in the database, sync from Linear if not
+	 */
+	private async ensureProjectExists(projectId: string): Promise<void> {
+		const existingProject = await this.db
+			.select()
+			.from(projects)
+			.where(eq(projects.id, projectId))
+			.limit(1);
+
+		if (existingProject.length === 0) {
+			console.warn(
+				`⚠️ Project ${projectId} not found - may need to sync projects first`,
+			);
 		}
 	}
 

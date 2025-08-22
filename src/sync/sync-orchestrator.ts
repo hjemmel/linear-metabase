@@ -1,5 +1,6 @@
 import { CycleSyncService } from "./cycle-sync.js";
 import { IssueSyncService } from "./issue-sync.js";
+import { ProjectSyncService } from "./project-sync.js";
 import { TeamMemberSyncService } from "./team-member-sync.js";
 import { TeamSyncService } from "./team-sync.js";
 import { UserSyncService } from "./user-sync.js";
@@ -9,7 +10,14 @@ export interface SyncOptions {
 	teamId?: string;
 	cycleId?: string;
 	limit?: number;
-	order?: ("users" | "teams" | "teamMembers" | "cycles" | "issues")[];
+	order?: (
+		| "users"
+		| "teams"
+		| "teamMembers"
+		| "cycles"
+		| "projects"
+		| "issues"
+	)[];
 }
 
 export class SyncOrchestrator {
@@ -17,6 +25,7 @@ export class SyncOrchestrator {
 	private teamSync: TeamSyncService;
 	private teamMemberSync: TeamMemberSyncService;
 	private cycleSync: CycleSyncService;
+	private projectSync: ProjectSyncService;
 	private issueSync: IssueSyncService;
 
 	constructor() {
@@ -24,6 +33,7 @@ export class SyncOrchestrator {
 		this.teamSync = new TeamSyncService();
 		this.teamMemberSync = new TeamMemberSyncService();
 		this.cycleSync = new CycleSyncService();
+		this.projectSync = new ProjectSyncService();
 		this.issueSync = new IssueSyncService();
 	}
 
@@ -46,6 +56,7 @@ export class SyncOrchestrator {
 				"teams",
 				"teamMembers",
 				"cycles",
+				"projects",
 				"issues",
 			];
 
@@ -69,6 +80,11 @@ export class SyncOrchestrator {
 						await this.cycleSync.sync({
 							incremental,
 							...(teamId && { teamId }),
+						});
+						break;
+					case "projects":
+						await this.projectSync.sync({
+							incremental,
 						});
 						break;
 					case "issues":
@@ -344,6 +360,7 @@ export class SyncOrchestrator {
 			teams: this.teamSync,
 			teamMembers: this.teamMemberSync,
 			cycles: this.cycleSync,
+			projects: this.projectSync,
 			issues: this.issueSync,
 		};
 	}

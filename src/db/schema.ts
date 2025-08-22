@@ -80,6 +80,41 @@ export const teamMembers = pgTable(
 	}),
 );
 
+// Projects table
+export const projects = pgTable(
+	"projects",
+	{
+		id: text("id").primaryKey(),
+		name: text("name").notNull(),
+		description: text("description"),
+		icon: text("icon"),
+		color: text("color"),
+		url: text("url"),
+		slugId: text("slug_id"),
+		state: text("state").notNull(), // planned, started, completed, canceled, backlog, paused
+		priority: integer("priority").default(0),
+		sortOrder: decimal("sort_order"),
+		targetDate: timestamp("target_date"),
+		startDate: timestamp("start_date"),
+		completedAt: timestamp("completed_at"),
+		canceledAt: timestamp("canceled_at"),
+		leadId: text("lead_id").references(() => users.id),
+		memberIds: jsonb("member_ids"), // Array of user IDs
+		teamIds: jsonb("team_ids"), // Array of team IDs
+		createdAt: timestamp("created_at").notNull(),
+		updatedAt: timestamp("updated_at").notNull(),
+		archivedAt: timestamp("archived_at"),
+		syncedAt: timestamp("synced_at").defaultNow(),
+	},
+	(table) => ({
+		nameIdx: index("projects_name_idx").on(table.name),
+		stateIdx: index("projects_state_idx").on(table.state),
+		leadIdx: index("projects_lead_idx").on(table.leadId),
+		completedIdx: index("projects_completed_idx").on(table.completedAt),
+		targetDateIdx: index("projects_target_date_idx").on(table.targetDate),
+	}),
+);
+
 // Cycles table
 export const cycles = pgTable(
 	"cycles",
@@ -116,6 +151,7 @@ export const issues = pgTable(
 			.notNull()
 			.references(() => teams.id),
 		cycleId: text("cycle_id").references(() => cycles.id),
+		projectId: text("project_id").references(() => projects.id),
 		number: integer("number").notNull(),
 		title: text("title").notNull(),
 		description: text("description"),
@@ -145,6 +181,7 @@ export const issues = pgTable(
 	(table) => ({
 		teamIdx: index("issues_team_idx").on(table.teamId),
 		cycleIdx: index("issues_cycle_idx").on(table.cycleId),
+		projectIdx: index("issues_project_idx").on(table.projectId),
 		assigneeIdx: index("issues_assignee_idx").on(table.assigneeId),
 		stateIdx: index("issues_state_idx").on(table.state),
 		completedIdx: index("issues_completed_idx").on(table.completedAt),
@@ -200,6 +237,14 @@ export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
 	}),
 }));
 
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+	lead: one(users, {
+		fields: [projects.leadId],
+		references: [users.id],
+	}),
+	issues: many(issues),
+}));
+
 export const cyclesRelations = relations(cycles, ({ one, many }) => ({
 	team: one(teams, {
 		fields: [cycles.teamId],
@@ -216,6 +261,10 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
 	cycle: one(cycles, {
 		fields: [issues.cycleId],
 		references: [cycles.id],
+	}),
+	project: one(projects, {
+		fields: [issues.projectId],
+		references: [projects.id],
 	}),
 	assignee: one(users, {
 		fields: [issues.assigneeId],
@@ -252,6 +301,9 @@ export type NewCycle = typeof cycles.$inferInsert;
 
 export type Issue = typeof issues.$inferSelect;
 export type NewIssue = typeof issues.$inferInsert;
+
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
 
 export type IssueComment = typeof issueComments.$inferSelect;
 export type NewIssueComment = typeof issueComments.$inferInsert;

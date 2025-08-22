@@ -60,6 +60,12 @@ async function main() {
 				});
 				break;
 
+			case "projects":
+				await orchestrator
+					.getServices()
+					.projects.sync({ incremental: hasFlag(args, "--incremental") });
+				break;
+
 			case "issues":
 				await handleIssuesSync(args.slice(1), orchestrator);
 				break;
@@ -234,6 +240,7 @@ COMMANDS:
   teams                  Sync teams only
   members                Sync team members only
   cycles                 Sync cycles only
+  projects               Sync projects only
   issues                 Sync issues only
   stats                  Show sync statistics
   validate               Validate sync integrity
@@ -271,6 +278,9 @@ EXAMPLES:
 
   # Sync only cycles for specific team
   npm run sync cycles --team-id=team_abc123
+
+  # Sync all projects
+  npm run sync projects
 
   # Get sync statistics
   npm run sync stats
