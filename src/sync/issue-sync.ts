@@ -9,6 +9,7 @@ import {
 } from "../db/schema.js";
 import { BaseSyncService } from "./base-sync.js";
 import { CycleSyncService } from "./cycle-sync.js";
+import { ProjectSyncService } from "./project-sync.js";
 import { TeamSyncService } from "./team-sync.js";
 import { UserSyncService } from "./user-sync.js";
 
@@ -56,12 +57,14 @@ export class IssueSyncService extends BaseSyncService {
 	private userSync: UserSyncService;
 	private teamSync: TeamSyncService;
 	private cycleSync: CycleSyncService;
+	private projectSync: ProjectSyncService;
 
 	constructor() {
 		super();
 		this.userSync = new UserSyncService();
 		this.teamSync = new TeamSyncService();
 		this.cycleSync = new CycleSyncService();
+		this.projectSync = new ProjectSyncService();
 	}
 	/**
 	 * Fetch issues using GraphQL to get complete data including state
@@ -757,9 +760,15 @@ export class IssueSyncService extends BaseSyncService {
 			.limit(1);
 
 		if (existingProject.length === 0) {
-			console.warn(
-				`⚠️ Project ${projectId} not found - may need to sync projects first`,
-			);
+			console.log(`📦 Syncing missing project: ${projectId}`);
+			try {
+				await this.projectSync.syncProjectById(projectId);
+				console.log(`✅ Synced project ${projectId}`);
+			} catch (error) {
+				console.error(`❌ Failed to sync project ${projectId}:`, error);
+				// Don't throw error - allow issue sync to continue even if project sync fails
+				console.warn(`⚠️ Issue will be created without project association`);
+			}
 		}
 	}
 
