@@ -1,5 +1,6 @@
 import { CycleSyncService } from "./cycle-sync.js";
 import { IssueSyncService } from "./issue-sync.js";
+import { LabelSyncService } from "./label-sync.js";
 import { ProjectSyncService } from "./project-sync.js";
 import { TeamMemberSyncService } from "./team-member-sync.js";
 import { TeamSyncService } from "./team-sync.js";
@@ -15,6 +16,7 @@ export interface SyncOptions {
 		| "teams"
 		| "teamMembers"
 		| "cycles"
+		| "labels"
 		| "projects"
 		| "issues"
 	)[];
@@ -25,6 +27,7 @@ export class SyncOrchestrator {
 	private teamSync: TeamSyncService;
 	private teamMemberSync: TeamMemberSyncService;
 	private cycleSync: CycleSyncService;
+	private labelSync: LabelSyncService;
 	private projectSync: ProjectSyncService;
 	private issueSync: IssueSyncService;
 
@@ -33,6 +36,7 @@ export class SyncOrchestrator {
 		this.teamSync = new TeamSyncService();
 		this.teamMemberSync = new TeamMemberSyncService();
 		this.cycleSync = new CycleSyncService();
+		this.labelSync = new LabelSyncService();
 		this.projectSync = new ProjectSyncService();
 		this.issueSync = new IssueSyncService();
 	}
@@ -56,6 +60,7 @@ export class SyncOrchestrator {
 				"teams",
 				"teamMembers",
 				"cycles",
+				"labels",
 				"projects",
 				"issues",
 			];
@@ -80,6 +85,11 @@ export class SyncOrchestrator {
 						await this.cycleSync.sync({
 							incremental,
 							...(teamId && { teamId }),
+						});
+						break;
+					case "labels":
+						await this.labelSync.sync({
+							incremental,
 						});
 						break;
 					case "projects":
@@ -360,6 +370,7 @@ export class SyncOrchestrator {
 			teams: this.teamSync,
 			teamMembers: this.teamMemberSync,
 			cycles: this.cycleSync,
+			labels: this.labelSync,
 			projects: this.projectSync,
 			issues: this.issueSync,
 		};

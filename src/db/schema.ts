@@ -80,6 +80,48 @@ export const teamMembers = pgTable(
 	}),
 );
 
+// Labels table
+export const labels = pgTable(
+	"labels",
+	{
+		id: text("id").primaryKey(),
+		name: text("name").notNull(),
+		description: text("description"),
+		color: text("color").notNull(),
+		createdAt: timestamp("created_at").notNull(),
+		updatedAt: timestamp("updated_at").notNull(),
+		archivedAt: timestamp("archived_at"),
+		syncedAt: timestamp("synced_at").defaultNow(),
+	},
+	(table) => ({
+		nameIdx: index("labels_name_idx").on(table.name),
+		colorIdx: index("labels_color_idx").on(table.color),
+	}),
+);
+
+// Issue labels junction table (many-to-many relationship)
+export const issueLabels = pgTable(
+	"issue_labels",
+	{
+		id: text("id").primaryKey(), // We'll use issueId-labelId as composite key
+		issueId: text("issue_id")
+			.notNull()
+			.references(() => issues.id, { onDelete: "cascade" }),
+		labelId: text("label_id")
+			.notNull()
+			.references(() => labels.id, { onDelete: "cascade" }),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => ({
+		issueIdx: index("issue_labels_issue_idx").on(table.issueId),
+		labelIdx: index("issue_labels_label_idx").on(table.labelId),
+		uniqueIssueLabelIdx: index("issue_labels_unique_idx").on(
+			table.issueId,
+			table.labelId,
+		),
+	}),
+);
+
 // Projects table
 export const projects = pgTable(
 	"projects",
@@ -237,6 +279,21 @@ export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
 	}),
 }));
 
+export const labelsRelations = relations(labels, ({ many }) => ({
+	issueLabels: many(issueLabels),
+}));
+
+export const issueLabelsRelations = relations(issueLabels, ({ one }) => ({
+	issue: one(issues, {
+		fields: [issueLabels.issueId],
+		references: [issues.id],
+	}),
+	label: one(labels, {
+		fields: [issueLabels.labelId],
+		references: [labels.id],
+	}),
+}));
+
 export const projectsRelations = relations(projects, ({ one, many }) => ({
 	lead: one(users, {
 		fields: [projects.leadId],
@@ -277,6 +334,7 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
 		relationName: "createdIssues",
 	}),
 	comments: many(issueComments),
+	issueLabels: many(issueLabels),
 }));
 
 export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
@@ -304,6 +362,12 @@ export type NewIssue = typeof issues.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
+
+export type Label = typeof labels.$inferSelect;
+export type NewLabel = typeof labels.$inferInsert;
+
+export type IssueLabel = typeof issueLabels.$inferSelect;
+export type NewIssueLabel = typeof issueLabels.$inferInsert;
 
 export type IssueComment = typeof issueComments.$inferSelect;
 export type NewIssueComment = typeof issueComments.$inferInsert;

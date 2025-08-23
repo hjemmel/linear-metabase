@@ -42,15 +42,6 @@ async function main() {
 					.teams.sync({ incremental: hasFlag(args, "--incremental") });
 				break;
 
-			case "members":
-				await orchestrator.getServices().teamMembers.sync({
-					incremental: hasFlag(args, "--incremental"),
-					...(getFlag(args, "--team-id") && {
-						teamId: getFlag(args, "--team-id"),
-					}),
-				});
-				break;
-
 			case "cycles":
 				await orchestrator.getServices().cycles.sync({
 					incremental: hasFlag(args, "--incremental"),
@@ -60,10 +51,25 @@ async function main() {
 				});
 				break;
 
+			case "labels":
+				await orchestrator
+					.getServices()
+					.labels.sync({ incremental: hasFlag(args, "--incremental") });
+				break;
+
 			case "projects":
 				await orchestrator
 					.getServices()
 					.projects.sync({ incremental: hasFlag(args, "--incremental") });
+				break;
+
+			case "members":
+				await orchestrator.getServices().teamMembers.sync({
+					incremental: hasFlag(args, "--incremental"),
+					...(getFlag(args, "--team-id") && {
+						teamId: getFlag(args, "--team-id"),
+					}),
+				});
 				break;
 
 			case "issues":
@@ -232,7 +238,7 @@ USAGE:
   npm run sync <command> [options]
 
 COMMANDS:
-  all                    Sync all entities (users, teams, members, cycles, issues)
+  all                    Sync all entities (users, teams, members, cycles, labels, projects, issues)
   cycle <cycle-id>       Sync issues for a specific cycle
   team <team-id>         Sync all data for a specific team
   essentials             Quick sync of core entities (users, teams, members, cycles)
@@ -240,6 +246,7 @@ COMMANDS:
   teams                  Sync teams only
   members                Sync team members only
   cycles                 Sync cycles only
+  labels                 Sync labels only
   projects               Sync projects only
   issues                 Sync issues only
   stats                  Show sync statistics
@@ -278,6 +285,9 @@ EXAMPLES:
 
   # Sync only cycles for specific team
   npm run sync cycles --team-id=team_abc123
+
+  # Sync all labels
+  npm run sync labels
 
   # Sync all projects
   npm run sync projects

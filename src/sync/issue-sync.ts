@@ -1,14 +1,18 @@
 import { eq } from "drizzle-orm";
 import {
 	cycles,
+	issueLabels,
 	issues,
+	labels,
 	type NewIssue,
+	type NewIssueLabel,
 	projects,
 	teams,
 	users,
 } from "../db/schema.js";
 import { BaseSyncService } from "./base-sync.js";
 import { CycleSyncService } from "./cycle-sync.js";
+import { LabelSyncService } from "./label-sync.js";
 import { ProjectSyncService } from "./project-sync.js";
 import { TeamSyncService } from "./team-sync.js";
 import { UserSyncService } from "./user-sync.js";
@@ -58,6 +62,7 @@ export class IssueSyncService extends BaseSyncService {
 	private teamSync: TeamSyncService;
 	private cycleSync: CycleSyncService;
 	private projectSync: ProjectSyncService;
+	private labelSync: LabelSyncService;
 
 	constructor() {
 		super();
@@ -65,6 +70,7 @@ export class IssueSyncService extends BaseSyncService {
 		this.teamSync = new TeamSyncService();
 		this.cycleSync = new CycleSyncService();
 		this.projectSync = new ProjectSyncService();
+		this.labelSync = new LabelSyncService();
 	}
 	/**
 	 * Fetch issues using GraphQL to get complete data including state
@@ -583,16 +589,15 @@ export class IssueSyncService extends BaseSyncService {
 		if (projectId) {
 			await this.ensureProjectExists(projectId);
 		}
-		// Parse labels from Linear format
-		let labels = null;
-		if (linearIssue.labels?.nodes) {
-			labels = linearIssue.labels.nodes.map(
-				(label: { id: string; name: string; color: string }) => ({
-					id: label.id,
-					name: label.name,
-					color: label.color,
-				}),
-			);
+
+		// Handle labels - ensure they exist and prepare junction table data
+		const labelIds: string[] = [];
+		if (linearIssue.labels?.nodes && linearIssue.labels.nodes.length > 0) {
+			for (const labelNode of linearIssue.labels.nodes) {
+				const labelId = labelNode.id;
+				await this.ensureLabelExists(labelId);
+				labelIds.push(labelId);
+			}
 		}
 
 		// Handle state data from GraphQL response
@@ -631,7 +636,7 @@ export class IssueSyncService extends BaseSyncService {
 			creatorId: creatorId,
 			state: stateName,
 			stateType: stateType,
-			labels: labels ? JSON.stringify(labels) : null,
+			labels: null, // We'll use the junction table instead
 			url: linearIssue.url || null,
 			branchName: linearIssue.branchName || null,
 			customerTicketCount: linearIssue.customerTicketCount || 0,
@@ -681,6 +686,9 @@ export class IssueSyncService extends BaseSyncService {
 			// Insert new issue
 			await this.db.insert(issues).values(issueData);
 		}
+
+		// Sync issue-label associations
+		await this.syncIssueLabels(linearIssue.id, labelIds);
 	}
 
 	/**
@@ -769,6 +777,48 @@ export class IssueSyncService extends BaseSyncService {
 				// Don't throw error - allow issue sync to continue even if project sync fails
 				console.warn(`⚠️ Issue will be created without project association`);
 			}
+		}
+	}
+
+	/**
+	 * Ensure a label exists in the database, sync from Linear if not
+	 */
+	private async ensureLabelExists(labelId: string): Promise<void> {
+		const existingLabel = await this.db
+			.select()
+			.from(labels)
+			.where(eq(labels.id, labelId))
+			.limit(1);
+
+		if (existingLabel.length === 0) {
+			try {
+				await this.labelSync.ensureLabelExists(labelId);
+			} catch (error) {
+				console.warn(`⚠️ Could not sync label ${labelId}:`, error);
+			}
+		}
+	}
+
+	/**
+	 * Sync issue-label associations in the junction table
+	 */
+	private async syncIssueLabels(
+		issueId: string,
+		labelIds: string[],
+	): Promise<void> {
+		// First, remove existing label associations for this issue
+		await this.db.delete(issueLabels).where(eq(issueLabels.issueId, issueId));
+
+		// Then, add new associations
+		if (labelIds.length > 0) {
+			const associations: NewIssueLabel[] = labelIds.map((labelId) => ({
+				id: `${issueId}-${labelId}`,
+				issueId,
+				labelId,
+				createdAt: new Date(),
+			}));
+
+			await this.db.insert(issueLabels).values(associations);
 		}
 	}
 

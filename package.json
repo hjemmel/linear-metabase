@@ -37,6 +37,7 @@
     "sync:users": "tsx src/sync/cli.ts users",
     "sync:teams": "tsx src/sync/cli.ts teams",
     "sync:cycles": "tsx src/sync/cli.ts cycles",
+    "sync:labels": "tsx src/sync/cli.ts labels",
     "sync:projects": "tsx src/sync/cli.ts projects",
     "sync:issues": "tsx src/sync/cli.ts issues",
     "sync:issues:incremental": "tsx src/sync/cli.ts issues --incremental",
