@@ -194,6 +194,7 @@ export const issues = pgTable(
 			.references(() => teams.id),
 		cycleId: text("cycle_id").references(() => cycles.id),
 		projectId: text("project_id").references(() => projects.id),
+		parentId: text("parent_id"),
 		number: integer("number").notNull(),
 		title: text("title").notNull(),
 		description: text("description"),
@@ -224,6 +225,7 @@ export const issues = pgTable(
 		teamIdx: index("issues_team_idx").on(table.teamId),
 		cycleIdx: index("issues_cycle_idx").on(table.cycleId),
 		projectIdx: index("issues_project_idx").on(table.projectId),
+		parentIdx: index("issues_parent_idx").on(table.parentId),
 		assigneeIdx: index("issues_assignee_idx").on(table.assigneeId),
 		stateIdx: index("issues_state_idx").on(table.state),
 		completedIdx: index("issues_completed_idx").on(table.completedAt),
@@ -322,6 +324,14 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
 	project: one(projects, {
 		fields: [issues.projectId],
 		references: [projects.id],
+	}),
+	parent: one(issues, {
+		fields: [issues.parentId],
+		references: [issues.id],
+		relationName: "parentIssue",
+	}),
+	children: many(issues, {
+		relationName: "parentIssue",
 	}),
 	assignee: one(users, {
 		fields: [issues.assigneeId],

@@ -84,6 +84,10 @@ async function main() {
 				await orchestrator.validateSync();
 				break;
 
+			case "hierarchy-stats":
+				await handleHierarchyStats(args.slice(1), orchestrator);
+				break;
+
 			case "help":
 			case "--help":
 			case "-h":
@@ -206,6 +210,47 @@ async function handleIssuesSync(
 	}
 }
 
+async function handleHierarchyStats(
+	args: string[],
+	orchestrator: SyncOrchestrator,
+) {
+	const teamId = getFlag(args, "--team-id");
+
+	console.log("📊 Analyzing issue hierarchy...");
+
+	try {
+		const issueService = orchestrator.getServices().issues;
+		const stats = await issueService.getHierarchyStats(teamId);
+
+		console.log("\n🔗 Issue Hierarchy Statistics:");
+		if (teamId) {
+			console.log(`Team: ${teamId}`);
+		}
+		console.log(`Total Issues: ${stats.totalIssues}`);
+		console.log(
+			`Root Issues: ${stats.rootIssues} (${((stats.rootIssues / stats.totalIssues) * 100).toFixed(1)}%)`,
+		);
+		console.log(
+			`Child Issues: ${stats.childIssues} (${((stats.childIssues / stats.totalIssues) * 100).toFixed(1)}%)`,
+		);
+		console.log(`Maximum Depth: ${stats.maxDepth} levels`);
+
+		// Additional insights
+		if (stats.maxDepth > 3) {
+			console.log(
+				"⚠️  Deep hierarchy detected - consider flattening for better organization",
+			);
+		}
+		if (stats.childIssues === 0) {
+			console.log(
+				"ℹ️  No parent-child relationships found - all issues are independent",
+			);
+		}
+	} catch (error) {
+		console.error("❌ Failed to get hierarchy stats:", error);
+	}
+}
+
 function hasFlag(args: string[], flag: string): boolean {
 	return args.includes(flag);
 }
@@ -251,6 +296,7 @@ COMMANDS:
   issues                 Sync issues only
   stats                  Show sync statistics
   validate               Validate sync integrity
+  hierarchy-stats        Show issue hierarchy statistics
   help                   Show this help message
 
 OPTIONS:
@@ -294,6 +340,12 @@ EXAMPLES:
 
   # Get sync statistics
   npm run sync stats
+
+  # Show issue hierarchy stats
+  npm run sync hierarchy-stats
+
+  # Show issue hierarchy stats for specific team
+  npm run sync hierarchy-stats --team-id=team_abc123
 
 ENVIRONMENT VARIABLES:
   DATABASE_URL           PostgreSQL connection string (required)

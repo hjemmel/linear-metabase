@@ -46,6 +46,7 @@
     "sync:help": "tsx src/sync/cli.ts help",
     "sync:stats": "tsx src/sync/cli.ts stats",
     "sync:validate": "tsx src/sync/cli.ts validate",
+    "sync:hierarchy-stats": "tsx src/sync/cli.ts hierarchy-stats",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",

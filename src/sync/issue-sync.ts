@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import {
 	cycles,
 	issueLabels,
@@ -53,6 +53,7 @@ interface LinearIssue {
 	team?: { id: string } | undefined;
 	cycle?: { id: string } | undefined;
 	project?: { id: string } | undefined;
+	parent?: { id: string } | undefined;
 	assignee?: { id: string } | undefined;
 	creator?: { id: string } | undefined;
 }
@@ -117,6 +118,9 @@ export class IssueSyncService extends BaseSyncService {
 							id
 						}
 						project {
+							id
+						}
+						parent {
 							id
 						}
 						assignee {
@@ -203,6 +207,9 @@ export class IssueSyncService extends BaseSyncService {
 								id
 							}
 							project {
+								id
+							}
+							parent {
 								id
 							}
 							assignee {
@@ -565,6 +572,7 @@ export class IssueSyncService extends BaseSyncService {
 		const creatorId = linearIssue.creator?.id || null;
 		const cycleId = linearIssue.cycle?.id || null;
 		const projectId = linearIssue.project?.id || null;
+		const parentId = linearIssue.parent?.id || null;
 
 		// Ensure dependencies exist before creating issue
 		if (!teamId) {
@@ -588,6 +596,10 @@ export class IssueSyncService extends BaseSyncService {
 
 		if (projectId) {
 			await this.ensureProjectExists(projectId);
+		}
+
+		if (parentId) {
+			await this.ensureParentIssueExists(parentId);
 		}
 
 		// Handle labels - ensure they exist and prepare junction table data
@@ -626,6 +638,7 @@ export class IssueSyncService extends BaseSyncService {
 			teamId: teamId,
 			cycleId: cycleId,
 			projectId: projectId,
+			parentId: parentId,
 			number: linearIssue.number,
 			title: linearIssue.title,
 			description: linearIssue.description || null,
@@ -800,6 +813,29 @@ export class IssueSyncService extends BaseSyncService {
 	}
 
 	/**
+	 * Ensure a parent issue exists in the database, sync from Linear if not
+	 */
+	private async ensureParentIssueExists(parentId: string): Promise<void> {
+		const existingIssue = await this.db
+			.select()
+			.from(issues)
+			.where(eq(issues.id, parentId))
+			.limit(1);
+
+		if (existingIssue.length === 0) {
+			console.log(`📋 Syncing parent issue: ${parentId}`);
+			try {
+				await this.syncIssueById(parentId);
+				console.log(`✅ Synced parent issue ${parentId}`);
+			} catch (error) {
+				console.error(`❌ Failed to sync parent issue ${parentId}:`, error);
+				// Don't throw error - allow issue sync to continue even if parent sync fails
+				console.warn(`⚠️ Issue will be created without parent association`);
+			}
+		}
+	}
+
+	/**
 	 * Sync issue-label associations in the junction table
 	 */
 	private async syncIssueLabels(
@@ -820,6 +856,108 @@ export class IssueSyncService extends BaseSyncService {
 
 			await this.db.insert(issueLabels).values(associations);
 		}
+	}
+
+	/**
+	 * Get issues by parent ID (get all children of a parent issue)
+	 */
+	async getChildIssues(
+		parentId: string,
+	): Promise<(typeof issues.$inferSelect)[]> {
+		return await this.db
+			.select()
+			.from(issues)
+			.where(eq(issues.parentId, parentId))
+			.orderBy(issues.createdAt);
+	}
+
+	/**
+	 * Get root issues (issues without parent)
+	 */
+	async getRootIssues(
+		teamId?: string,
+	): Promise<(typeof issues.$inferSelect)[]> {
+		if (teamId) {
+			return await this.db
+				.select()
+				.from(issues)
+				.where(and(eq(issues.teamId, teamId), isNull(issues.parentId)))
+				.orderBy(issues.createdAt);
+		} else {
+			return await this.db
+				.select()
+				.from(issues)
+				.where(isNull(issues.parentId))
+				.orderBy(issues.createdAt);
+		}
+	}
+
+	/**
+	 * Get issue hierarchy depth (how many levels deep an issue is)
+	 */
+	async getIssueDepth(issueId: string): Promise<number> {
+		const issue = await this.db
+			.select({ parentId: issues.parentId })
+			.from(issues)
+			.where(eq(issues.id, issueId))
+			.limit(1);
+
+		if (!issue[0] || !issue[0].parentId) {
+			return 0; // Root issue
+		}
+
+		// Recursively check parent depth
+		return 1 + (await this.getIssueDepth(issue[0].parentId));
+	}
+
+	/**
+	 * Get issue hierarchy stats for a team
+	 */
+	async getHierarchyStats(teamId?: string): Promise<{
+		totalIssues: number;
+		rootIssues: number;
+		childIssues: number;
+		maxDepth: number;
+	}> {
+		let total: (typeof issues.$inferSelect)[];
+		let roots: (typeof issues.$inferSelect)[];
+		let children: (typeof issues.$inferSelect)[];
+
+		if (teamId) {
+			[total, roots, children] = await Promise.all([
+				this.db.select().from(issues).where(eq(issues.teamId, teamId)),
+				this.db
+					.select()
+					.from(issues)
+					.where(and(eq(issues.teamId, teamId), isNull(issues.parentId))),
+				this.db
+					.select()
+					.from(issues)
+					.where(and(eq(issues.teamId, teamId), isNotNull(issues.parentId))),
+			]);
+		} else {
+			[total, roots, children] = await Promise.all([
+				this.db.select().from(issues),
+				this.db.select().from(issues).where(isNull(issues.parentId)),
+				this.db.select().from(issues).where(isNotNull(issues.parentId)),
+			]);
+		}
+
+		// Calculate max depth (simplified - could be optimized)
+		let maxDepth = 0;
+		for (const issue of total) {
+			const depth = await this.getIssueDepth(issue.id);
+			if (depth > maxDepth) {
+				maxDepth = depth;
+			}
+		}
+
+		return {
+			totalIssues: total.length,
+			rootIssues: roots.length,
+			childIssues: children.length,
+			maxDepth,
+		};
 	}
 
 	/**
