@@ -60,7 +60,7 @@
     "@types/pg": "^8.15.5",
     "drizzle-kit": "^0.31.4",
     "tsx": "^4.19.0",
-    "typescript": "^5.9.2"
+    "typescript": "^7.0.0"
   },
   "dependencies": {
     "@linear/sdk": "^56.0.0",
